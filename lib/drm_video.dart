@@ -26,7 +26,8 @@ class DrmVideoPlayer extends StatefulWidget {
     this.drmLicenseUrl = "",
     this.onVideoControls,
     this.formatHint = "",
-    this.autoPlay = true,
+    this.autoPlay = true, this.onAudios,
+    this.onSubtitles
   }) : assert(videoUrl != null);
 
   final String videoUrl;
@@ -34,6 +35,8 @@ class DrmVideoPlayer extends StatefulWidget {
   final String formatHint;
   final bool autoPlay;
   final Function(VideoController) onVideoControls;
+  final Function(List<String>) onAudios;
+  final Function(List<String>) onSubtitles;
 
   @override
   _DrmVideoPlayerState createState() => _DrmVideoPlayerState();
@@ -58,9 +61,11 @@ class _DrmVideoPlayerState extends State<DrmVideoPlayer> {
             return;
           }
           VideoController _controller = VideoController()..init(id);
-          _controller.initialize();
+          _controller.initialize().then((value){
+            widget.onVideoControls(_controller);
+
+          });
           if (widget.autoPlay) _controller.play();
-          widget.onVideoControls(_controller);
         },
         gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
         creationParams: creationParams,
@@ -92,9 +97,11 @@ class _DrmVideoPlayerState extends State<DrmVideoPlayer> {
               return;
             }
             VideoController _controller = VideoController()..init(id);
-            _controller.initialize();
+            _controller.initialize().then((value){
+            });
             if (widget.autoPlay) _controller.play();
             widget.onVideoControls(_controller);
+
           })
           ..create();
       },

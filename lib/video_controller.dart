@@ -154,7 +154,10 @@ class VideoController extends ValueNotifier<VideoPlayerValue> {
           value = value.copyWith(
             duration: event.duration,
             size: event.size,
+            audios: event.audios,
+            subtitles: event.subtitles
           );
+
           _applyLooping();
           _applyVolume();
           _applyPlayPause();
@@ -188,11 +191,18 @@ class VideoController extends ValueNotifier<VideoPlayerValue> {
       final Map<dynamic, dynamic> map = event;
       switch (map['event']) {
         case 'initialized':
+          final width = map['width']?.toDouble() ?? 0.0;
+          final height  = map['height']?.toDouble() ?? 0.0;
+          print(map['audios']);
+          final audios = map['audios'] as List<dynamic>;
+          final subtitles = map['subtitles'] as List<dynamic>;
           return VideoEvent(
             eventType: VideoEventType.initialized,
             duration: Duration(milliseconds: map['duration']),
-            size: Size(map['width']?.toDouble() ?? 0.0,
-                map['height']?.toDouble() ?? 0.0),
+            size: Size(width,height
+               ),
+            audios: audios.map((e) => e.toString()).toList(),
+            subtitles: subtitles.map((e) => e.toString()).toList(),
           );
         case 'completed':
           return VideoEvent(
@@ -235,6 +245,29 @@ class VideoController extends ValueNotifier<VideoPlayerValue> {
 
     _isDisposed = true;
     super.dispose();
+  }
+
+  Future<List<String>> getAudios() async {
+   final List<String> audios =  await _channel.invokeListMethod("getAudios");
+   return audios;
+  }
+
+  Future<void> setAudioByIndex(int i) async {
+     _channel.invokeMethod("setAudio",i);
+  }
+
+  void setSubtitleByIndex(int i) {
+    _channel.invokeMethod("setSubtitle",i);
+
+  }
+
+  Future<List<String>>getSubtitles() async {
+    final List<String> subtitles =  await _channel.invokeListMethod("getSubtitles");
+    return subtitles;
+  }
+
+  Future<void> changeUrl(String url) async {
+    await _channel.invokeMethod("changeUrl",url);
   }
 }
 
@@ -282,6 +315,8 @@ class VideoPlayerValue {
     this.isPlaying = false,
     this.isLooping = false,
     this.isBuffering = false,
+    this.audios = const <String>[],
+    this.subtitles = const  <String>[],
     this.volume = 1.0,
     this.playbackSpeed = 1.0,
     this.errorDescription,
@@ -299,6 +334,8 @@ class VideoPlayerValue {
   ///
   /// Is null when [initialized] is false.
   final Duration duration;
+  final List<String> audios;
+  final List<String> subtitles;
 
   /// The current playback position.
   final Duration position;
@@ -361,6 +398,8 @@ class VideoPlayerValue {
     bool isPlaying,
     bool isLooping,
     bool isBuffering,
+    List<String> audios,
+    List<String> subtitles,
     double volume,
     double playbackSpeed,
     String errorDescription,
@@ -374,6 +413,8 @@ class VideoPlayerValue {
       isLooping: isLooping ?? this.isLooping,
       isBuffering: isBuffering ?? this.isBuffering,
       volume: volume ?? this.volume,
+      audios: audios ?? this.audios,
+      subtitles: subtitles ?? this.subtitles,
       playbackSpeed: playbackSpeed ?? this.playbackSpeed,
       errorDescription: errorDescription ?? this.errorDescription,
     );
@@ -491,6 +532,8 @@ class VideoEvent {
     this.duration,
     this.size,
     this.buffered,
+    this.audios,
+    this.subtitles
   });
 
   /// The type of the event.
@@ -505,6 +548,9 @@ class VideoEvent {
   ///
   /// Only used if [eventType] is [VideoEventType.initialized].
   final Size size;
+
+  final List<String> audios;
+  final List<String> subtitles;
 
   /// Buffered parts of the video.
   ///

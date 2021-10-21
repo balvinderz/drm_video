@@ -42,19 +42,39 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.platform.PlatformView
 import java.util.*
 import kotlin.collections.HashMap
+import com.google.android.exoplayer2.RendererCapabilities
+
+import com.google.android.exoplayer2.ui.DefaultTrackNameProvider
+
+import com.google.android.exoplayer2.ui.TrackNameProvider
+
+import com.google.android.exoplayer2.source.TrackGroup
+
+import com.google.android.exoplayer2.source.TrackGroupArray
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector.ParametersBuilder
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector.SelectionOverride
+
+import java.util.ArrayList
+
+import com.google.android.exoplayer2.trackselection.MappingTrackSelector
+import com.google.android.exoplayer2.trackselection.MappingTrackSelector.MappedTrackInfo
+import com.google.android.exoplayer2.DefaultRenderersFactory
+import com.google.android.exoplayer2.ext.ffmpeg.FfmpegLibrary
+import com.google.android.exoplayer2.util.Log
 
 
 internal class DrmVideoPlayer(
         private val context: Context,
         private val messenger: BinaryMessenger,
         private val id: Int,
-        private val params: Map<String, Any>) : PlatformView, MethodChannel.MethodCallHandler {
+        private var params: Map<String, Any>) : PlatformView, MethodChannel.MethodCallHandler {
 
 
     private val FORMAT_SS = "ss"
     private val FORMAT_DASH = "dash"
     private val FORMAT_HLS = "hls"
     private val FORMAT_OTHER = "other"
+    lateinit var trackSelector: DefaultTrackSelector
 
     private var view: View? = null
 
@@ -94,11 +114,36 @@ internal class DrmVideoPlayer(
             "seekTo" -> {
                 seekTo(call, result)
             }
+            "getAudios" -> {
+                val audios  = getAudios()
+                result.success(audios)
+            }
+            "getSubtitles" -> {
+                val subtitles = getSubtitles()
+                result.success(subtitles)
+            }
+            "changeUrl" -> {
+                val url = call.arguments as String
+                val newParams = HashMap(params)
+                newParams["videoUrl"] = url
+                params = newParams
+                isInitialized = false
+                eventChannel = null
+                player?.stop()
+                player?.release()
+                initializePlayer()
+            }
             "play" -> {
                 play(result);
             }
             "pause" -> {
                 pause(result);
+            }
+            "setAudio" -> {
+                setAudioByIndex(call.arguments as Int)
+            }
+            "setSubtitle" -> {
+                setSubtitleByIndex(call.arguments as Int)
             }
             "setVolume" -> {
                 setVolume(call);
@@ -114,6 +159,115 @@ internal class DrmVideoPlayer(
             }
             "dispose" -> {
                 dispose();
+            }
+        }
+    }
+
+
+    private fun setSubtitleByIndex(index: Int) {
+        val mappedTrackInfo = trackSelector.currentMappedTrackInfo
+        var trackCount = 0
+        if (mappedTrackInfo != null) {
+            trackCount = mappedTrackInfo.rendererCount
+        }
+        var audioIndex = 0
+        for (i in 0 until trackCount) {
+            if (mappedTrackInfo!!.getRendererType(i) != C.TRACK_TYPE_TEXT) {
+                continue
+            }
+            val trackGroupArray = mappedTrackInfo.getTrackGroups(i)
+            for (j in 0 until trackGroupArray.length) {
+                val group = trackGroupArray[j]
+                for (k in 0 until group.length) {
+                    if (audioIndex == index) {
+                        val builder = trackSelector.parameters
+                                .buildUpon()
+                        builder.clearSelectionOverrides(i).setRendererDisabled(i, false)
+                        val tracks = intArrayOf(k)
+                        val override = SelectionOverride(
+                                j, *tracks)
+                        builder.setSelectionOverride(i, mappedTrackInfo.getTrackGroups(i), override)
+                        trackSelector.setParameters(builder)
+                        return
+                    }
+                    audioIndex++
+                }
+            }
+        }
+    }
+
+    private fun getSubtitles(): List<String> {
+        val mappedTrackInfo: MappedTrackInfo = trackSelector.currentMappedTrackInfo ?: return ArrayList()
+        val audios = ArrayList<String>()
+        for (i in 0 until mappedTrackInfo.rendererCount) {
+            if (mappedTrackInfo.getRendererType(i) != C.TRACK_TYPE_TEXT) continue
+            val trackGroupArray = mappedTrackInfo.getTrackGroups(i)
+            for (j in 0 until trackGroupArray.length) {
+                val group = trackGroupArray[j]
+                val provider: TrackNameProvider = DefaultTrackNameProvider(context.resources)
+                for (k in 0 until group.length) {
+                    if (mappedTrackInfo.getTrackSupport(i, j, k) and 7
+                            == RendererCapabilities.FORMAT_HANDLED) {
+                        //trackSelector.setParameters(builder);
+                        audios.add(provider.getTrackName(group.getFormat(k)))
+                    }
+                }
+            }
+        }
+        return audios
+    }
+
+    private fun getAudios() : List<String> {
+        val mappedTrackInfo: MappedTrackInfo = trackSelector.currentMappedTrackInfo ?: return ArrayList()
+        val audios = ArrayList<String>()
+        for (i in 0 until mappedTrackInfo.rendererCount) {
+            if (mappedTrackInfo.getRendererType(i) != C.TRACK_TYPE_AUDIO) continue
+            val trackGroupArray = mappedTrackInfo.getTrackGroups(i)
+            for (j in 0 until trackGroupArray.length) {
+                val group = trackGroupArray[j]
+                val provider: TrackNameProvider = DefaultTrackNameProvider(context.resources)
+                for (k in 0 until group.length) {
+                    if (mappedTrackInfo.getTrackSupport(i, j, k) and 7
+                            == RendererCapabilities.FORMAT_HANDLED) {
+                        //trackSelector.setParameters(builder);
+                        audios.add(provider.getTrackName(group.getFormat(k)))
+                    }
+                }
+            }
+        }
+
+        return audios
+
+
+    }
+    private fun setAudioByIndex(index: Int) {
+        val mappedTrackInfo = trackSelector.currentMappedTrackInfo
+        var trackCount = 0
+        if (mappedTrackInfo != null) {
+            trackCount = mappedTrackInfo.rendererCount
+        }
+        var audioIndex = 0
+        for (i in 0 until trackCount) {
+            if (mappedTrackInfo!!.getRendererType(i) != C.TRACK_TYPE_AUDIO) {
+                continue
+            }
+            val trackGroupArray = mappedTrackInfo.getTrackGroups(i)
+            for (j in 0 until trackGroupArray.length) {
+                val group = trackGroupArray[j]
+                for (k in 0 until group.length) {
+                    if (audioIndex == index) {
+                        val builder = trackSelector.parameters
+                                .buildUpon()
+                        builder.clearSelectionOverrides(i).setRendererDisabled(i, false)
+                        val tracks = intArrayOf(k)
+                        val override = SelectionOverride(
+                                j, *tracks)
+                        builder.setSelectionOverride(i, mappedTrackInfo.getTrackGroups(i), override)
+                        trackSelector.setParameters(builder)
+                        return
+                    }
+                    audioIndex++
+                }
             }
         }
     }
@@ -181,10 +335,14 @@ internal class DrmVideoPlayer(
             formatHint = params["formatHint"] as String;
         }
 
-        val trackSelector = DefaultTrackSelector(context)
+        trackSelector = DefaultTrackSelector(context)
         trackSelector.setParameters(
                 trackSelector.buildUponParameters().setMaxVideoSizeSd()
+
         )
+        val defaultRenderersFactory = DefaultRenderersFactory(context)
+        defaultRenderersFactory
+                .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
         var drmSessionManager: DrmSessionManager? = null;
 
@@ -194,15 +352,16 @@ internal class DrmVideoPlayer(
 
             drmSessionManager = DefaultDrmSessionManager.Builder().build(drmCallback)
         }
+        val ffmpegAvailable = FfmpegLibrary.isAvailable()
+        Log.i("isAvailable", ffmpegAvailable.toString())
 
-        player = SimpleExoPlayer.Builder(context)
+        player = SimpleExoPlayer.Builder(context,defaultRenderersFactory)
                 .setTrackSelector(trackSelector)
                 .build()
 
         val uri: Uri = Uri.parse(drmLicenseUrl);
 
-        val dataSourceFactory: DataSource.Factory
-        dataSourceFactory = if (isHTTP(uri)) {
+        val dataSourceFactory: DataSource.Factory = if (isHTTP(uri)) {
             DefaultHttpDataSourceFactory(
                     "ExoPlayer",
                     null,
@@ -341,10 +500,12 @@ internal class DrmVideoPlayer(
             val event: HashMap<String, Any> = HashMap()
             event.put("event", "initialized")
             event.put("duration", player!!.duration)
+            event.put("audios",(getAudios()))
+            event.put("subtitles",(getSubtitles()))
             if (player?.videoFormat != null) {
                 val videoFormat: Format? = player?.videoFormat
                 var width: Int = videoFormat!!.width
-                var height: Int = videoFormat!!.height
+                var height: Int = videoFormat.height
                 val rotationDegrees: Int = videoFormat.rotationDegrees
                 // Switch the width/height if video was taken in portrait mode
                 if (rotationDegrees == 90 || rotationDegrees == 270) {
