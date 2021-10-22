@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:drm_video/drm_video.dart';
 import 'package:drm_video/video_controller.dart';
@@ -13,7 +14,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp>  with TickerProviderStateMixin {
   VideoController _videoController;
-  String url = "https://github.com/Matroska-Org/matroska-test-files/blob/master/test_files/test5.mkv?raw=true";
+  String url = "https://bitmovin-a.akamaihd.net/content/sintel/hls/playlist.m3u8";
   String licenseUrl = "https://proxy.staging.widevine.com/proxy";
   TabController controller;
   @override
@@ -67,7 +68,6 @@ class _MyAppState extends State<MyApp>  with TickerProviderStateMixin {
                             print("url is $url");
                            _videoController.changeUrl(url);
                             // await _videoController.pause();
-
                           },
                           child: Icon(
                             Icons.play_arrow,
@@ -87,6 +87,7 @@ class _MyAppState extends State<MyApp>  with TickerProviderStateMixin {
                         child: DrmVideoPlayer(
                           videoUrl: url,
                           autoPlay: true,
+                          initialFontSize : 20,
                           drmLicenseUrl: licenseUrl,
                           onVideoControls: (VideoController controller) {
                             print("onVideoControls $controller");
@@ -109,11 +110,6 @@ class _MyAppState extends State<MyApp>  with TickerProviderStateMixin {
                 ),
                 if (_videoController != null)
                   VideoProgressIndicator(_videoController, allowScrubbing: true),
-                if (_videoController != null)
-                  Text("text ${_videoController.value.position}"),
-                if (_videoController != null)
-                  Text("text ${_videoController.value.duration}"),
-                Text("text ${_videoController == null}"),
                 TabBar(
                   tabs: [
                     Tab(
@@ -156,9 +152,8 @@ class _MyAppState extends State<MyApp>  with TickerProviderStateMixin {
   }
 }
 
-class _ControlsOverlay extends StatelessWidget {
+class _ControlsOverlay extends StatefulWidget {
   const _ControlsOverlay({Key key, this.controller}) : super(key: key);
-
   static const _examplePlaybackRates = [
     0.25,
     0.5,
@@ -169,19 +164,37 @@ class _ControlsOverlay extends StatelessWidget {
     5.0,
     10.0,
   ];
+  static const _exampleFontSize = [
+    20.0,
+    25.0,
+  30.0,
+    35.0,
+    40.0,
+    45.0,
+    50.0,
+    60.0,
+    100.0
+  ];
 
   final VideoController controller;
 
   @override
+  State<_ControlsOverlay> createState() => _ControlsOverlayState();
+}
+
+class _ControlsOverlayState extends State<_ControlsOverlay> {
+  double initialFontSize = 20.0;
+
+  @override
   Widget build(BuildContext context) {
     return AspectRatio(
-      aspectRatio: controller?.value?.aspectRatio ?? 16 / 9,
+      aspectRatio: widget.controller?.value?.aspectRatio ?? 16 / 9,
       child: Stack(
         children: <Widget>[
           AnimatedSwitcher(
             duration: Duration(milliseconds: 50),
             reverseDuration: Duration(milliseconds: 200),
-            child: controller.value.isPlaying
+            child: widget.controller.value.isPlaying
                 ? SizedBox.shrink()
                 : Container(
                     color: Colors.black26,
@@ -196,38 +209,71 @@ class _ControlsOverlay extends StatelessWidget {
           ),
           GestureDetector(
             onTap: () {
-              controller.value.isPlaying
-                  ? controller.pause()
-                  : controller.play();
+              widget.controller.value.isPlaying
+                  ? widget.controller.pause()
+                  : widget.controller.play();
             },
           ),
           Align(
             alignment: Alignment.topRight,
-            child: PopupMenuButton<double>(
-              initialValue: controller.value.playbackSpeed,
-              tooltip: 'Playback speed',
-              onSelected: (speed) {
-                controller.setPlaybackSpeed(speed);
-              },
-              itemBuilder: (context) {
-                return [
-                  for (final speed in _examplePlaybackRates)
-                    PopupMenuItem(
-                      value: speed,
-                      child: Text('${speed}x'),
-                    )
-                ];
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  // Using less vertical padding as the text is also longer
-                  // horizontally, so it feels like it would need more spacing
-                  // horizontally (matching the aspect ratio of the video).
-                  vertical: 12,
-                  horizontal: 16,
+            child: Column(
+              children: [
+                PopupMenuButton<double>(
+                  initialValue: widget.controller.value.playbackSpeed,
+                  tooltip: 'Playback speed',
+                  onSelected: (speed) {
+                    widget.controller.setPlaybackSpeed(speed);
+                  },
+                  itemBuilder: (context) {
+                    return [
+                      for (final speed in _ControlsOverlay._examplePlaybackRates)
+                        PopupMenuItem(
+                          value: speed,
+                          child: Text('${speed}x'),
+                        )
+                    ];
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      // Using less vertical padding as the text is also longer
+                      // horizontally, so it feels like it would need more spacing
+                      // horizontally (matching the aspect ratio of the video).
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
+                    child: Text('${widget.controller.value.playbackSpeed}x'),
+                  ),
                 ),
-                child: Text('${controller.value.playbackSpeed}x'),
-              ),
+                PopupMenuButton<double>(
+                  initialValue: widget.controller.value.playbackSpeed,
+                  tooltip: 'Font Size',
+                  onSelected: (fontSize) {
+                    setState(() {
+                      this.initialFontSize = fontSize;
+                    });
+                    widget.controller.changeFontSize(fontSize);
+                  },
+                  itemBuilder: (context) {
+                    return [
+                      for (final speed in _ControlsOverlay._exampleFontSize)
+                        PopupMenuItem(
+                          value: speed,
+                          child: Text("$speed"),
+                        )
+                    ];
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      // Using less vertical padding as the text is also longer
+                      // horizontally, so it feels like it would need more spacing
+                      // horizontally (matching the aspect ratio of the video).
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
+                    child: Text('$initialFontSize Font Size'),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

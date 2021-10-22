@@ -2,6 +2,7 @@ package com.plugin.drm_video
 
 import android.content.Context
 import android.net.Uri
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import com.google.android.exoplayer2.*
@@ -61,6 +62,12 @@ import com.google.android.exoplayer2.trackselection.MappingTrackSelector.MappedT
 import com.google.android.exoplayer2.DefaultRenderersFactory
 import com.google.android.exoplayer2.ext.ffmpeg.FfmpegLibrary
 import com.google.android.exoplayer2.util.Log
+import com.google.android.exoplayer2.extractor.mp3.Mp3Extractor
+
+import com.google.android.exoplayer2.extractor.DefaultExtractorsFactory
+import com.google.android.exoplayer2.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES
+import com.google.android.exoplayer2.extractor.ts.DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS
+import com.google.android.exoplayer2.source.hls.DefaultHlsExtractorFactory
 
 
 internal class DrmVideoPlayer(
@@ -100,7 +107,6 @@ internal class DrmVideoPlayer(
             view = LayoutInflater.from(context).inflate(R.layout.activity_main, null)
         }
         playerView = view!!.findViewById(R.id.video_view)
-
         eventChannel = EventChannel(messenger, "drmvideo_events$id")
         methodChannel = MethodChannel(messenger, "drmvideo_$id")
         methodChannel?.setMethodCallHandler(this)
@@ -121,6 +127,10 @@ internal class DrmVideoPlayer(
             "getSubtitles" -> {
                 val subtitles = getSubtitles()
                 result.success(subtitles)
+            }
+            "changeFontSize" -> {
+                val fontSize = call.arguments as Double
+                changeFontSize(fontSize)
             }
             "changeUrl" -> {
                 val url = call.arguments as String
@@ -321,9 +331,12 @@ internal class DrmVideoPlayer(
         var videoUrl = "";
         var drmLicenseUrl = "";
         var formatHint: String? = null
-
+        var fontSize : Double = 20.0
         if (params.containsKey("videoUrl")) {
             videoUrl = params["videoUrl"] as String;
+        }
+        if(params.containsKey("initialFontSize")){
+            fontSize = params["initialFontSize"] as Double
         }
 
         if (params.containsKey("drmLicenseUrl")) {
@@ -354,7 +367,6 @@ internal class DrmVideoPlayer(
         }
         val ffmpegAvailable = FfmpegLibrary.isAvailable()
         Log.i("isAvailable", ffmpegAvailable.toString())
-
         player = SimpleExoPlayer.Builder(context,defaultRenderersFactory)
                 .setTrackSelector(trackSelector)
                 .build()
@@ -381,8 +393,14 @@ internal class DrmVideoPlayer(
 
 //        player?.playWhenReady = autoPlay
         player?.prepare()
-
+        playerView?.subtitleView?.setApplyEmbeddedStyles(false)
+        playerView?.subtitleView?.setFixedTextSize(TypedValue.COMPLEX_UNIT_PX,fontSize.toFloat())
         setUpVideo()
+    }
+
+    private fun changeFontSize(fontSize : Double){
+        playerView?.subtitleView?.setFixedTextSize(TypedValue.COMPLEX_UNIT_PX,fontSize.toFloat())
+
     }
 
     private fun buildMediaSource(
@@ -402,18 +420,14 @@ internal class DrmVideoPlayer(
             C.TYPE_SS -> SsMediaSource.Factory(
                     DefaultSsChunkSource.Factory(mediaDataSourceFactory),
                     DefaultDataSourceFactory(context, null, mediaDataSourceFactory))
-                    .setDrmSessionManager(drmSessionManager)
                     .createMediaSource(MediaItem.fromUri(uri))
             C.TYPE_DASH -> DashMediaSource.Factory(
                     DefaultDashChunkSource.Factory(mediaDataSourceFactory),
                     DefaultDataSourceFactory(context, null, mediaDataSourceFactory))
-                    .setDrmSessionManager(drmSessionManager)
                     .createMediaSource(MediaItem.fromUri(uri))
-            C.TYPE_HLS -> HlsMediaSource.Factory(mediaDataSourceFactory)
-                    .setDrmSessionManager(drmSessionManager)
+            C.TYPE_HLS -> HlsMediaSource.Factory(mediaDataSourceFactory).setExtractorFactory(DefaultHlsExtractorFactory(FLAG_ALLOW_NON_IDR_KEYFRAMES,true))
                     .createMediaSource(MediaItem.fromUri(uri))
             C.TYPE_OTHER -> ProgressiveMediaSource.Factory(mediaDataSourceFactory)
-                    .setDrmSessionManager(drmSessionManager)
                     .createMediaSource(MediaItem.fromUri(uri))
             else -> {
                 throw IllegalStateException("Unsupported type: $type")

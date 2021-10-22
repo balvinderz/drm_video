@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:drm_video/video_controller.dart';
 import 'package:flutter/cupertino.dart';
@@ -27,12 +28,13 @@ class DrmVideoPlayer extends StatefulWidget {
     this.onVideoControls,
     this.formatHint = "",
     this.autoPlay = true, this.onAudios,
-    this.onSubtitles
+    this.onSubtitles,this.initialFontSize =20.0,
   }) : assert(videoUrl != null);
 
   final String videoUrl;
   final String drmLicenseUrl;
   final String formatHint;
+  final double initialFontSize;
   final bool autoPlay;
   final Function(VideoController) onVideoControls;
   final Function(List<String>) onAudios;
@@ -51,6 +53,7 @@ class _DrmVideoPlayerState extends State<DrmVideoPlayer> {
       "drmLicenseUrl": widget.drmLicenseUrl,
       "formatHint": widget.formatHint,
       "autoPlay": widget.autoPlay,
+      "initialFontSize" : max(0,widget.initialFontSize)
     };
 
     if (Platform.isIOS) {
@@ -292,24 +295,37 @@ class _VideoProgressIndicatorState extends State<VideoProgressIndicator> {
       final int position = controller.value.position.inMilliseconds;
 
       int maxBuffering = 0;
+
       for (DurationRange range in controller.value.buffered) {
         final int end = range.end.inMilliseconds;
         if (end > maxBuffering) {
           maxBuffering = end;
         }
       }
+      var x =0.0 ;
+      var y = 0.0;
+      try{
+        x = (maxBuffering / duration).isNaN ? 0 : maxBuffering / duration;
 
+      }catch(e){
+        y = (position / duration).isNaN ? 0 : position / duration;
+      }
+      try{
+
+      }catch(e){
+
+      }
       progressIndicator = Stack(
         fit: StackFit.passthrough,
         children: <Widget>[
           LinearProgressIndicator(
             value:
-                (maxBuffering / duration).isNaN ? 0 : maxBuffering / duration,
+                x,
             valueColor: AlwaysStoppedAnimation<Color>(colors.bufferedColor),
             backgroundColor: colors.backgroundColor,
           ),
           LinearProgressIndicator(
-            value: (position / duration).isNaN ? 0 : position / duration,
+            value: y,
             valueColor: AlwaysStoppedAnimation<Color>(colors.playedColor),
             backgroundColor: Colors.transparent,
           ),

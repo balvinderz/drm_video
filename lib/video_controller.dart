@@ -193,12 +193,15 @@ class VideoController extends ValueNotifier<VideoPlayerValue> {
         case 'initialized':
           final width = map['width']?.toDouble() ?? 0.0;
           final height  = map['height']?.toDouble() ?? 0.0;
-          print(map['audios']);
+          print(height);
+          print(width);
+          final duration = map['duration'] ;
           final audios = map['audios'] as List<dynamic>;
           final subtitles = map['subtitles'] as List<dynamic>;
+          print(duration);
           return VideoEvent(
             eventType: VideoEventType.initialized,
-            duration: Duration(milliseconds: map['duration']),
+            duration: Duration(milliseconds: duration),
             size: Size(width,height
                ),
             audios: audios.map((e) => e.toString()).toList(),
@@ -268,6 +271,9 @@ class VideoController extends ValueNotifier<VideoPlayerValue> {
 
   Future<void> changeUrl(String url) async {
     await _channel.invokeMethod("changeUrl",url);
+  }
+  Future<void> changeFontSize(double fontSize) async {
+    await _channel.invokeMethod("changeFontSize",fontSize);
   }
 }
 
