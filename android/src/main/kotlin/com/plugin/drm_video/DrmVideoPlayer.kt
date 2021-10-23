@@ -458,7 +458,7 @@ internal class DrmVideoPlayer(
                 })
 
         player?.addListener(
-                object : Player.EventListener {
+                object : Player.Listener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         if (playbackState == Player.STATE_BUFFERING) {
                             sendBufferingUpdate()
@@ -472,10 +472,6 @@ internal class DrmVideoPlayer(
                             event["event"] = "completed"
                             eventSink.success(event)
                         }
-                    }
-
-                    override fun onPlayerError(error: ExoPlaybackException) {
-                        eventSink.error("VideoError", "Video player had error $error", null)
                     }
                 })
     }
