@@ -15,30 +15,30 @@ typedef void VideoControllerCreatedCallback(VideoController controller);
 class DrmVideo {
   static const MethodChannel _channel = const MethodChannel('drm_video');
 
-  static Future<String> get platformVersion async {
-    final String version = await _channel.invokeMethod('getPlatformVersion');
+  static Future<String?> get platformVersion async {
+    final String? version = await _channel.invokeMethod('getPlatformVersion');
     return version;
   }
 }
 
 class DrmVideoPlayer extends StatefulWidget {
   DrmVideoPlayer({
-    @required this.videoUrl,
+    required this.videoUrl,
     this.drmLicenseUrl = "",
     this.onVideoControls,
     this.formatHint = "",
     this.autoPlay = true, this.onAudios,
     this.onSubtitles,this.initialFontSize =20.0,
-  }) : assert(videoUrl != null);
+  });
 
   final String videoUrl;
   final String drmLicenseUrl;
   final String formatHint;
   final double initialFontSize;
   final bool autoPlay;
-  final Function(VideoController) onVideoControls;
-  final Function(List<String>) onAudios;
-  final Function(List<String>) onSubtitles;
+  final Function(VideoController)? onVideoControls;
+  final Function(List<String>)? onAudios;
+  final Function(List<String>)? onSubtitles;
 
   @override
   _DrmVideoPlayerState createState() => _DrmVideoPlayerState();
@@ -65,7 +65,7 @@ class _DrmVideoPlayerState extends State<DrmVideoPlayer> {
           }
           VideoController _controller = VideoController()..init(id);
           _controller.initialize().then((value){
-            widget.onVideoControls(_controller);
+            widget.onVideoControls!(_controller);
 
           });
           if (widget.autoPlay) _controller.play();
@@ -81,7 +81,7 @@ class _DrmVideoPlayerState extends State<DrmVideoPlayer> {
       surfaceFactory:
           (BuildContext context, PlatformViewController controller) {
         return AndroidViewSurface(
-          controller: controller,
+          controller: controller as AndroidViewController,
           gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
           hitTestBehavior: PlatformViewHitTestBehavior.opaque,
         );
@@ -103,7 +103,7 @@ class _DrmVideoPlayerState extends State<DrmVideoPlayer> {
             _controller.initialize().then((value){
             });
             if (widget.autoPlay) _controller.play();
-            widget.onVideoControls(_controller);
+            widget.onVideoControls!(_controller);
 
           })
           ..create();
@@ -154,8 +154,8 @@ class VideoProgressColors {
 
 class _VideoScrubber extends StatefulWidget {
   _VideoScrubber({
-    @required this.child,
-    @required this.controller,
+    required this.child,
+    required this.controller,
   });
 
   final Widget child;
@@ -173,10 +173,10 @@ class _VideoScrubberState extends State<_VideoScrubber> {
   @override
   Widget build(BuildContext context) {
     void seekToRelativePosition(Offset globalPosition) {
-      final RenderBox box = context.findRenderObject();
+      final RenderBox box = context.findRenderObject() as RenderBox;
       final Offset tapPos = box.globalToLocal(globalPosition);
       final double relative = tapPos.dx / box.size.width;
-      final Duration position = controller.value.duration * relative;
+      final Duration position = controller.value.duration! * relative;
       controller.seekTo(position);
     }
 
@@ -229,7 +229,7 @@ class VideoProgressIndicator extends StatefulWidget {
   /// to `top: 5.0`.
   VideoProgressIndicator(
     this.controller, {
-    VideoProgressColors colors,
+    VideoProgressColors? colors,
     this.allowScrubbing,
     this.padding = const EdgeInsets.only(top: 5.0),
   }) : colors = colors ?? VideoProgressColors();
@@ -247,7 +247,7 @@ class VideoProgressIndicator extends StatefulWidget {
   /// accordingly. The widget ignores such input when false.
   ///
   /// Defaults to false.
-  final bool allowScrubbing;
+  final bool? allowScrubbing;
 
   /// This allows for visual padding around the progress indicator that can
   /// still detect gestures via [allowScrubbing].
@@ -269,7 +269,7 @@ class _VideoProgressIndicatorState extends State<VideoProgressIndicator> {
     };
   }
 
-  VoidCallback listener;
+  late VoidCallback listener;
 
   VideoController get controller => widget.controller;
 
@@ -291,7 +291,7 @@ class _VideoProgressIndicatorState extends State<VideoProgressIndicator> {
   Widget build(BuildContext context) {
     Widget progressIndicator;
     if (controller.value.initialized) {
-      final int duration = controller.value.duration.inMilliseconds;
+      final int duration = controller.value.duration!.inMilliseconds;
       final int position = controller.value.position.inMilliseconds;
 
       int maxBuffering = 0;
@@ -342,7 +342,7 @@ class _VideoProgressIndicatorState extends State<VideoProgressIndicator> {
       padding: widget.padding,
       child: progressIndicator,
     );
-    if (widget.allowScrubbing) {
+    if (widget.allowScrubbing!) {
       return _VideoScrubber(
         child: paddedProgressIndicator,
         controller: controller,
