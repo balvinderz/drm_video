@@ -33,7 +33,6 @@ import com.google.android.exoplayer2.ui.StyledPlayerView
 import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource
-import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory
 import com.google.android.exoplayer2.util.Util
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
@@ -361,7 +360,7 @@ internal class DrmVideoPlayer(
 
 
         if (drmLicenseUrl.isNotEmpty()) {
-            val drmCallback = HttpMediaDrmCallback(drmLicenseUrl, DefaultHttpDataSourceFactory())
+            val drmCallback = HttpMediaDrmCallback(drmLicenseUrl, DefaultHttpDataSource.Factory())
 
             drmSessionManager = DefaultDrmSessionManager.Builder().build(drmCallback)
         }
@@ -374,13 +373,7 @@ internal class DrmVideoPlayer(
         val uri: Uri = Uri.parse(drmLicenseUrl);
 
         val dataSourceFactory: DataSource.Factory = if (isHTTP(uri)) {
-            DefaultHttpDataSourceFactory(
-                    "ExoPlayer",
-                    null,
-                    DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS,
-                    DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS,
-                    true
-            )
+            DefaultHttpDataSource.Factory().setUserAgent("Exoplayer")
         } else {
             DefaultDataSourceFactory(context, "ExoPlayer")
         }
@@ -456,30 +449,29 @@ internal class DrmVideoPlayer(
 //                        eventSink.setDelegate(null)
 //                    }
                 })
+        val listener = object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                if (eventSink != null) {
+                    eventSink.error("VideoError", "Video player had error $error", null);
+                }
+            }
 
-        player?.addListener(
-                object : Player.Listener {
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        if (playbackState == Player.STATE_BUFFERING) {
-                            sendBufferingUpdate()
-                        } else if (playbackState == Player.STATE_READY) {
-                            if (!isInitialized) {
-                                isInitialized = true
-                                sendInitialized()
-                            }
-                        } else if (playbackState == Player.STATE_ENDED) {
-                            val event: HashMap<String, Any> = HashMap()
-                            event["event"] = "completed"
-                            eventSink.success(event)
-                        }
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_BUFFERING) {
+                    sendBufferingUpdate()
+                } else if (playbackState == Player.STATE_READY) {
+                    if (!isInitialized) {
+                        isInitialized = true
+                        sendInitialized()
                     }
-
-                    override fun onPlayerError(error: ExoPlaybackException) {
-                        if (eventSink != null) {
-                            eventSink.error("VideoError", "Video player had error $error", null);
-                        }
-                    }
-                })
+                } else if (playbackState == Player.STATE_ENDED) {
+                    val event: HashMap<String, Any> = HashMap()
+                    event["event"] = "completed"
+                    eventSink.success(event)
+                }
+            }
+        }
+        player?.addListener(listener)
     }
 
     private fun isHTTP(uri: Uri?): Boolean {
